@@ -96,29 +96,54 @@ Func PixelSearchEx($hImage,$sX,$sY,$color)
     Local $iPixel, $iRowOffset
     Local $found_pixel = False
     Local $abscoord_pixel[2] = [0, 0]
-
-    For $iY = $sY To $iH - 1
-        $iRowOffset = $iY * $iW + 1
-        For $iX = $sX To $iW - 1 ;get each pixel in each line and row
-            $iPixel = DllStructGetData($tPixel, 1, $iRowOffset + $iX) ;get pixel color
-            Local $pixel_color = _ColorGetRGB("0x" & Hex($iPixel, 6))
-            If (($pixel_color[0] >= $red_low and $pixel_color[0] <= $red_high) and ($pixel_color[1] >= $green_low and $pixel_color[1] <= $green_high) and ($pixel_color[2] >= $blue_low and $pixel_color[2] <= $blue_high)) Then
-                $abscoord_pixel[0] = $iX
-                $abscoord_pixel[1] = $iY
-                $found_pixel = True
-                ExitLoop
-            EndIf
-        Next
-    Next
-
-	MsgBox(0,0,$abscoord_pixel[0])
-	MsgBox(0,0,$abscoord_pixel[1])
+		For $iY = $sY To $iH - 1
+			$iRowOffset = $iY * $iW + 1
+			For $iX = $sX To $iW - 1 ;get each pixel in each line and row
+				$iPixel = DllStructGetData($tPixel, 1, $iRowOffset + $iX) ;get pixel color
+				Local $pixel_color = _ColorGetRGB("0x" & Hex($iPixel, 6))
+				If (($pixel_color[0] >= $red_low and $pixel_color[0] <= $red_high) and ($pixel_color[1] >= $green_low and $pixel_color[1] <= $green_high) and ($pixel_color[2] >= $blue_low and $pixel_color[2] <= $blue_high)) Then
+					$abscoord_pixel[0] = $iX
+					$abscoord_pixel[1] = $iY
+					$found_pixel = True
+					ExitLoop
+				EndIf
+			Next
+		Next
     _GDIPlus_BitmapUnlockBits($hBitmap, $tBitmapData)
-
-    ;cleanup resources
     _GDIPlus_ImageDispose($hImage)
     _GDIPlus_GraphicsDispose($hContext)
     _GDIPlus_BitmapDispose($hBitmap)
     _GDIPlus_Shutdown()
 	Return $abscoord_pixel
 EndFunc
+
+
+Func GetColorWD($iX, $iY, $WinHandle)
+	If Not IsHWnd($WinHandle) And $WinHandle <> "" Then
+		$WinHandle = WinGetHandle($WinHandle)
+	EndIf
+    Local $aPos = WinGetPos($WinHandle)
+    $iWidth = $aPos[2]
+    $iHeight = $aPos[3]
+
+    _GDIPlus_Startup()
+
+    Local $hDDC = _WinAPI_GetDC($WinHandle)
+    Local $hCDC = _WinAPI_CreateCompatibleDC($hDDC)
+
+    $hBMP = _WinAPI_CreateCompatibleBitmap($hDDC, $iWidth, $iHeight)
+
+    _WinAPI_SelectObject($hCDC, $hBMP)
+    DllCall("User32.dll", "int", "PrintWindow", "hwnd", $WinHandle, "hwnd", $hCDC, "int", 0)
+    _WinAPI_BitBlt($hCDC, 0, 0, $iWidth, $iHeight, $hDDC, 0, 0, $__SCREENCAPTURECONSTANT_SRCCOPY)
+
+    $BMP = _GDIPlus_BitmapCreateFromHBITMAP($hBMP)
+    Local $aPixelColor = _GDIPlus_BitmapGetPixel($BMP, $iX, $iY)
+
+    _WinAPI_ReleaseDC($WinHandle, $hDDC)
+    _WinAPI_DeleteDC($hCDC)
+    _WinAPI_DeleteObject($hBMP)
+    _GDIPlus_ImageDispose($BMP)
+
+    Return Hex($aPixelColor, 6)
+EndFunc   ;==>GetColor
